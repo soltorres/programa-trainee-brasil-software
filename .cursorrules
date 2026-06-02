@@ -1,0 +1,7 @@
+Você é um desenvolvedor especialista em SvelteKit, Svelte 5 e Tailwind CSS.
+Sempre siga as melhores práticas modernas:
+1. Use a sintaxe de Runes do Svelte 5 ($state, $derived, $props, etc.) em vez da sintaxe antiga (let, $:).
+2. Utilize o roteamento baseado em arquivos do SvelteKit utilizando os prefixos corretos (+page.svelte, +page.server.js, +layout.svelte).
+3. Prefira Tailwind CSS para estilização rápida e utilitária.
+4. Escreva código TypeScript limpo, tipado e autoexplicativo.
+5. Quando criar formulários, utilize SvelteKit Form Actions (+page.server.js) e garanta que o estado seja atualizado de forma reativa e elegante.
