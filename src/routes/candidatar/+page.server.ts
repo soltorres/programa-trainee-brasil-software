@@ -10,8 +10,6 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Actions, PageServerLoad } from './$types';
 
-const MIN_PASSWORD_LENGTH = 6;
-
 export const load: PageServerLoad = async ({ locals: { session, supabase } }) => {
 	if (session) {
 		const { data: candidate } = await supabase
@@ -112,20 +110,22 @@ export const actions: Actions = {
 		const fullName = formData.get('full_name');
 		const birthDate = formData.get('birth_date');
 		const educationLevel = formData.get('education_level');
-		const email = formData.get('email');
-		const password = formData.get('password');
-		const passwordConfirm = formData.get('password_confirm');
 		const resume = formData.get('resume');
 
 		const {
-			data: { user: existingUser }
+			data: { user: existingUser },
+			error: authError
 		} = await supabase.auth.getUser();
+
+		if (authError) {
+			console.error('candidatar getUser', authError);
+		}
 
 		const values = {
 			full_name: typeof fullName === 'string' ? fullName : '',
 			birth_date: typeof birthDate === 'string' ? birthDate : '',
 			education_level: typeof educationLevel === 'string' ? educationLevel : '',
-			email: typeof email === 'string' ? email : existingUser?.email ?? ''
+			email: existingUser?.email ?? ''
 		};
 
 		if (typeof fullName !== 'string' || fullName.trim().length < 3) {
@@ -163,72 +163,19 @@ export const actions: Actions = {
 			});
 		}
 
+		if (!existingUser) {
+			return fail(401, {
+				error:
+					'Sessão não encontrada. Ative o JavaScript, tente novamente ou faça login para concluir seu cadastro.',
+				values
+			});
+		}
+
 		const resumeBuffer = Buffer.from(await resume.arrayBuffer());
-
-		if (existingUser) {
-			return saveCandidateProfile(
-				supabase,
-				existingUser.id,
-				{
-					fullName: fullName.trim(),
-					birthDate,
-					educationLevel,
-					resumeBuffer,
-					resumeType: resume.type,
-					extension
-				},
-				values
-			);
-		}
-
-		if (typeof email !== 'string' || !email.trim() || !email.includes('@')) {
-			return fail(400, { error: 'Informe um e-mail válido.', values });
-		}
-
-		if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
-			return fail(400, {
-				error: `A senha deve ter pelo menos ${MIN_PASSWORD_LENGTH} caracteres.`,
-				values
-			});
-		}
-
-		if (password !== passwordConfirm) {
-			return fail(400, { error: 'As senhas não coincidem.', values });
-		}
-
-		const { data: authData, error: signUpError } = await supabase.auth.signUp({
-			email: email.trim(),
-			password,
-			options: {
-				data: {
-					full_name: fullName.trim()
-				}
-			}
-		});
-
-		if (signUpError) {
-			return fail(400, { error: signUpError.message, values });
-		}
-
-		const userId = authData.user?.id;
-		if (!userId) {
-			return fail(500, {
-				error: 'Não foi possível concluir o cadastro. Tente novamente.',
-				values
-			});
-		}
-
-		if (!authData.session) {
-			return {
-				success: true,
-				message:
-					'Conta criada! Confirme seu e-mail pelo link enviado e depois faça login para acompanhar seu progresso. Boa Jornada!'
-			};
-		}
 
 		return saveCandidateProfile(
 			supabase,
-			userId,
+			existingUser.id,
 			{
 				fullName: fullName.trim(),
 				birthDate,

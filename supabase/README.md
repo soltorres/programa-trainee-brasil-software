@@ -77,3 +77,12 @@ Colunas usadas em `candidates`: `admin_notes`, `is_frozen` (incluídas no `setup
 ## Auth
 
 Para upload do currículo logo após o cadastro, desative a confirmação de e-mail em *Authentication → Providers → Email*, ou o candidato confirma o e-mail e completa o perfil em `/candidatar`.
+
+Em **Authentication → URL Configuration**, inclua a URL de produção (ex.: `https://seu-app.vercel.app`) em **Site URL** e em **Redirect URLs** (com `/candidatar`).
+
+### Erro ao cadastrar ("falha na busca" ou similar)
+
+1. **Vercel:** confira `PUBLIC_SUPABASE_URL` e `PUBLIC_SUPABASE_PUBLISHABLE_KEY` nas variáveis de ambiente (mesmos valores do `.env` local).
+2. **Supabase pausado:** projetos gratuitos pausam por inatividade — reative no dashboard (primeira requisição pode demorar).
+3. **Logs:** *Authentication → Logs* e *Postgres → Logs* no momento do cadastro. Erros 500 costumam ser **trigger** em `auth.users` (função que falha ao criar usuário). Remova ou corrija triggers customizados no schema `auth`.
+4. **Confirmação de e-mail:** com confirmação ativa, o candidato recebe o link por e-mail e só depois conclui o perfil em `/candidatar`.

@@ -1,3 +1,4 @@
+import { formatAuthError } from '$lib/supabaseErrors';
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions } from './$types';
 
@@ -21,7 +22,8 @@ export const actions: Actions = {
 		});
 
 		if (error) {
-			return fail(401, { error: error.message });
+			console.error('login signInWithPassword', error);
+			return fail(401, { error: formatAuthError(error) });
 		}
 
 		redirect(303, '/dashboard');

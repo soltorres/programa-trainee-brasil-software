@@ -4,10 +4,11 @@ import {
 	PUBLIC_SUPABASE_URL
 } from '$env/static/public';
 import { redirect, type Handle } from '@sveltejs/kit';
+import type { Cookies } from '@sveltejs/kit';
 
 const PUBLIC_EXACT_ROUTES = ['/', '/login', '/logout', '/candidatar'];
 
-const PUBLIC_PREFIX_ROUTES = ['/superadmin'];
+const PUBLIC_PREFIX_ROUTES = ['/superadmin', '/desafio-tecnico'];
 
 function isPublicRoute(pathname: string): boolean {
 	if (PUBLIC_EXACT_ROUTES.includes(pathname)) return true;
@@ -16,7 +17,23 @@ function isPublicRoute(pathname: string): boolean {
 	);
 }
 
+function shouldSkipAuth(pathname: string): boolean {
+	if (pathname.startsWith('/_app/')) return true;
+	if (/\.(png|ico|svg|webp|woff2?|txt|map)$/i.test(pathname)) return true;
+	return false;
+}
+
+function hasSupabaseAuthCookies(cookies: Cookies): boolean {
+	return cookies.getAll().some(({ name }) => name.includes('-auth-token'));
+}
+
 export const handle: Handle = async ({ event, resolve }) => {
+	const { pathname } = event.url;
+
+	if (shouldSkipAuth(pathname)) {
+		return resolve(event);
+	}
+
 	event.locals.supabase = createServerClient(
 		PUBLIC_SUPABASE_URL,
 		PUBLIC_SUPABASE_PUBLISHABLE_KEY,
@@ -32,27 +49,34 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 	);
 
-	const {
-		data: { session: cookieSession }
-	} = await event.locals.supabase.auth.getSession();
+	const isAnonymousPublicGet =
+		event.request.method === 'GET' &&
+		isPublicRoute(pathname) &&
+		!hasSupabaseAuthCookies(event.cookies);
 
-	if (!cookieSession) {
+	if (isAnonymousPublicGet) {
 		event.locals.session = null;
 	} else {
 		const {
-			data: { user },
-			error
-		} = await event.locals.supabase.auth.getUser();
+			data: { session: cookieSession }
+		} = await event.locals.supabase.auth.getSession();
 
-		if (error || !user) {
+		if (!cookieSession) {
 			event.locals.session = null;
 		} else {
-			const { user: _staleUser, ...sessionWithoutUser } = cookieSession;
-			event.locals.session = { ...sessionWithoutUser, user };
+			const {
+				data: { user },
+				error
+			} = await event.locals.supabase.auth.getUser();
+
+			if (error || !user) {
+				event.locals.session = null;
+			} else {
+				const { user: _staleUser, ...sessionWithoutUser } = cookieSession;
+				event.locals.session = { ...sessionWithoutUser, user };
+			}
 		}
 	}
-
-	const { pathname } = event.url;
 
 	if (!event.locals.session && !isPublicRoute(pathname)) {
 		redirect(303, '/login');

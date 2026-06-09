@@ -1,14 +1,23 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import logo from '$lib/assets/brasil-software-logo.png';
+	import { getSupabaseClient } from '$lib/supabase/context';
+	import { formatAuthError } from '$lib/supabaseErrors';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
+	const supabase = getSupabaseClient();
+	const MIN_PASSWORD_LENGTH = 6;
+
 	let loading = $state(false);
+	let clientError = $state<string | null>(null);
+	let emailConfirmMessage = $state<string | null>(null);
 
 	const inputClass =
 		'mt-1.5 block w-full rounded-xl border-slate-300 shadow-sm focus:border-brand-green focus:ring-brand-green';
+
+	const displayError = $derived(clientError ?? form?.error ?? null);
 </script>
 
 <div class="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-slate-50 px-4 py-12">
@@ -28,12 +37,12 @@
 				{/if}
 			</p>
 
-			{#if form?.success}
+			{#if emailConfirmMessage}
 				<p
 					class="mt-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800"
 					role="status"
 				>
-					{form.message}
+					{emailConfirmMessage}
 				</p>
 				<p class="mt-6 text-center text-sm text-slate-500">
 					<a href="/login" class="font-medium text-brand-green-dark hover:underline">Ir para o login</a>
@@ -43,8 +52,67 @@
 					method="POST"
 					enctype="multipart/form-data"
 					class="mt-8 space-y-8"
-					use:enhance={() => {
+					use:enhance={async ({ formElement, cancel }) => {
 						loading = true;
+						clientError = null;
+						emailConfirmMessage = null;
+
+						if (!data.completingProfile) {
+							const formData = new FormData(formElement);
+							const email = formData.get('email');
+							const password = formData.get('password');
+							const passwordConfirm = formData.get('password_confirm');
+							const fullName = formData.get('full_name');
+
+							if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
+								clientError = `A senha deve ter pelo menos ${MIN_PASSWORD_LENGTH} caracteres.`;
+								loading = false;
+								cancel();
+								return;
+							}
+
+							if (password !== passwordConfirm) {
+								clientError = 'As senhas não coincidem.';
+								loading = false;
+								cancel();
+								return;
+							}
+
+							if (typeof email !== 'string' || !email.trim().includes('@')) {
+								clientError = 'Informe um e-mail válido.';
+								loading = false;
+								cancel();
+								return;
+							}
+
+							const { data: authData, error } = await supabase.auth.signUp({
+								email: email.trim(),
+								password,
+								options: {
+									data: {
+										full_name: typeof fullName === 'string' ? fullName.trim() : undefined
+									},
+									emailRedirectTo: `${window.location.origin}/candidatar`
+								}
+							});
+
+							if (error) {
+								console.error('candidatar signUp', error);
+								clientError = formatAuthError(error);
+								loading = false;
+								cancel();
+								return;
+							}
+
+							if (!authData.session) {
+								emailConfirmMessage =
+									'Conta criada! Confirme seu e-mail pelo link enviado e depois faça login para acompanhar seu progresso. Boa Jornada!';
+								loading = false;
+								cancel();
+								return;
+							}
+						}
+
 						return async ({ update }) => {
 							loading = false;
 							await update();
@@ -171,9 +239,9 @@
 						</fieldset>
 					{/if}
 
-					{#if form?.error}
+					{#if displayError}
 						<p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
-							{form.error}
+							{displayError}
 						</p>
 					{/if}
 
