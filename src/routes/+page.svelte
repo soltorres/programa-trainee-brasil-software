@@ -159,7 +159,7 @@
 						class="group inline-flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:border-green-500"
 					>
 						<LineIcon name="refresh" class="h-4 w-4 text-slate-500" />
-						6h por dia
+						25h semanais
 					</span>
 					<span
 						class="group inline-flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:border-green-500"
