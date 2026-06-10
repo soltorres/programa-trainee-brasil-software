@@ -46,6 +46,14 @@ export function formatAuthError(error: AuthErrorLike): string {
 		return 'Erro ao criar a conta no servidor de autenticação. Tente novamente; se persistir, a equipe Brasil Software deve verificar os logs do Supabase (Authentication → Logs).';
 	}
 
+	if (
+		code === 'over_email_send_rate_limit' ||
+		message.includes('rate limit exceeded') ||
+		message.includes('email rate limit')
+	) {
+		return 'O limite de envio de e-mails de confirmação foi atingido. Aguarde cerca de 1 hora e tente novamente, ou faça login se já criou a conta. Se precisar de ajuda, fale com a equipe Brasil Software.';
+	}
+
 	if (code === 'user_already_exists' || message.includes('already registered')) {
 		return 'Este e-mail já está cadastrado. Faça login ou use outro endereço.';
 	}

@@ -18,6 +18,9 @@
 	}
 
 	function statusBadge(candidate: AdminCandidateRow) {
+		if (candidate.profileIncomplete) {
+			return { label: 'Cadastro incompleto', class: 'bg-amber-100 text-amber-900' };
+		}
 		if (candidate.isFrozen) {
 			return { label: 'Congelado', class: 'bg-slate-200 text-slate-700' };
 		}
@@ -26,6 +29,10 @@
 		}
 		return { label: candidate.currentPhaseLabel, class: 'bg-blue-100 text-blue-800' };
 	}
+
+	const completeCount = $derived(
+		data.configured ? data.candidates.filter((c) => !c.profileIncomplete).length : 0
+	);
 </script>
 
 <svelte:head>
@@ -48,7 +55,17 @@
 				</p>
 			</div>
 			<p class="text-sm font-medium text-slate-500">
-				{data.configured ? data.candidates.length : 0} candidato(s)
+				{#if data.configured}
+					{data.candidates.length} no total
+					<span class="text-slate-400">·</span>
+					{completeCount} com perfil completo
+					{#if data.incompleteCount > 0}
+						<span class="text-slate-400">·</span>
+						{data.incompleteCount} cadastro incompleto
+					{/if}
+				{:else}
+					0 candidato(s)
+				{/if}
 			</p>
 		</div>
 	</header>
@@ -154,9 +171,13 @@
 												<div class="flex gap-2">
 													<dt class="w-28 shrink-0 text-slate-500">Nascimento</dt>
 													<dd class="text-slate-800">
-														{new Date(candidate.birthDate + 'T12:00:00').toLocaleDateString(
-															'pt-BR'
-														)}
+														{#if candidate.birthDate}
+															{new Date(candidate.birthDate + 'T12:00:00').toLocaleDateString(
+																'pt-BR'
+															)}
+														{:else}
+															—
+														{/if}
 													</dd>
 												</div>
 												<div class="flex gap-2">
@@ -237,67 +258,75 @@
 												{/each}
 											</ul>
 
-											<div class="mt-6 space-y-4">
-												<AdminPhaseForm
-													{candidate}
-													phaseOptions={data.phaseOptions}
-												/>
+											{#if candidate.profileIncomplete}
+												<p class="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+													Esta pessoa criou conta, mas não concluiu o formulário em
+													<code class="rounded bg-amber-100/80 px-1">/candidatar</code> (currículo e
+													dados). Peça para tentar novamente ou fazer login e completar o cadastro.
+												</p>
+											{:else}
+												<div class="mt-6 space-y-4">
+													<AdminPhaseForm
+														{candidate}
+														phaseOptions={data.phaseOptions}
+													/>
 
-												<div class="flex flex-wrap gap-2">
-													{#if candidate.isFrozen}
-														<form method="POST" action="/superadmin?/unfreeze" use:enhance>
-															<input
-																type="hidden"
-																name="candidateId"
-																value={candidate.id}
-															/>
-															<button
-																type="submit"
-																class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-green-500"
-															>
-																Descongelar
-															</button>
-														</form>
-													{:else}
-														<form method="POST" action="/superadmin?/freeze" use:enhance>
-															<input
-																type="hidden"
-																name="candidateId"
-																value={candidate.id}
-															/>
-															<button
-																type="submit"
-																class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-amber-400"
-															>
-																Congelar candidato
-															</button>
-														</form>
-													{/if}
+													<div class="flex flex-wrap gap-2">
+														{#if candidate.isFrozen}
+															<form method="POST" action="/superadmin?/unfreeze" use:enhance>
+																<input
+																	type="hidden"
+																	name="candidateId"
+																	value={candidate.id}
+																/>
+																<button
+																	type="submit"
+																	class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-green-500"
+																>
+																	Descongelar
+																</button>
+															</form>
+														{:else}
+															<form method="POST" action="/superadmin?/freeze" use:enhance>
+																<input
+																	type="hidden"
+																	name="candidateId"
+																	value={candidate.id}
+																/>
+																<button
+																	type="submit"
+																	class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-amber-400"
+																>
+																	Congelar candidato
+																</button>
+															</form>
+														{/if}
+													</div>
+
+													<form method="POST" action="/superadmin?/updateNotes" use:enhance>
+														<input type="hidden" name="candidateId" value={candidate.id} />
+														<label
+															for="notes-{candidate.id}"
+															class="block text-xs font-semibold text-slate-700"
+														>
+															Anotações internas
+														</label>
+														<textarea
+															id="notes-{candidate.id}"
+															name="notes"
+															rows="3"
+															class="mt-1 block w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:outline-none"
+															placeholder="Visível apenas neste painel…"
+														>{candidate.adminNotes}</textarea>
+														<button
+															type="submit"
+															class="mt-2 rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-900"
+														>
+															Salvar anotação
+														</button>
+													</form>
 												</div>
-
-												<form method="POST" action="/superadmin?/updateNotes" use:enhance>
-													<input type="hidden" name="candidateId" value={candidate.id} />
-													<label
-														for="notes-{candidate.id}"
-														class="block text-xs font-semibold text-slate-700"
-													>
-														Anotações internas
-													</label>
-													<textarea
-														id="notes-{candidate.id}"
-														name="notes"
-														rows="3"
-														class="mt-1 block w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:outline-none"
-														placeholder="Visível apenas neste painel…"
-													>{candidate.adminNotes}</textarea>
-													<button
-														type="submit"
-														class="mt-2 rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-900"
-													>
-														Salvar anotação
-													</button>
-												</form>
-											</div>
+											{/if}
 										</div>
 									</div>
 								</div>

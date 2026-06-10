@@ -76,7 +76,19 @@ Colunas usadas em `candidates`: `admin_notes`, `is_frozen` (incluídas no `setup
 
 ## Auth
 
-Para upload do currículo logo após o cadastro, desative a confirmação de e-mail em *Authentication → Providers → Email*, ou o candidato confirma o e-mail e completa o perfil em `/candidatar`.
+### Cadastro em massa (recomendado para o processo seletivo)
+
+Com vários candidatos se cadastrando ao mesmo tempo, **desative a confirmação de e-mail**:
+
+1. Supabase Dashboard → **Authentication** → **Providers** → **Email**
+2. Desligue **Confirm email**
+3. Salve
+
+Assim o cadastro conclui na hora (com currículo) e **não dispara e-mail** a cada inscrição — evitando o erro `email rate limit exceeded`.
+
+O SMTP embutido do Supabase envia poucos e-mails por hora (cerca de 3–4). Não use isso em produção com muitos cadastros.
+
+**Alternativa para produção com confirmação de e-mail:** configure SMTP próprio em *Project Settings → Authentication → SMTP* (Resend, SendGrid, etc.) e ajuste os limites em *Authentication → Rate Limits*.
 
 Em **Authentication → URL Configuration**, inclua a URL de produção (ex.: `https://seu-app.vercel.app`) em **Site URL** e em **Redirect URLs** (com `/candidatar`).
 
@@ -86,3 +98,4 @@ Em **Authentication → URL Configuration**, inclua a URL de produção (ex.: `h
 2. **Supabase pausado:** projetos gratuitos pausam por inatividade — reative no dashboard (primeira requisição pode demorar).
 3. **Logs:** *Authentication → Logs* e *Postgres → Logs* no momento do cadastro. Erros 500 costumam ser **trigger** em `auth.users` (função que falha ao criar usuário). Remova ou corrija triggers customizados no schema `auth`.
 4. **Confirmação de e-mail:** com confirmação ativa, o candidato recebe o link por e-mail e só depois conclui o perfil em `/candidatar`.
+5. **`email rate limit exceeded`:** limite do SMTP padrão. Desative **Confirm email** (ver seção Auth acima) ou configure SMTP próprio.

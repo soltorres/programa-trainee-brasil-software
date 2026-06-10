@@ -22,17 +22,19 @@ export const load: PageServerLoad = async ({ url }) => {
 			configured: false as const,
 			candidates: [],
 			warning: null,
+			incompleteCount: 0,
 			successMessage,
 			phaseOptions: SELECTION_PHASES.map((phase) => ({ key: phase.key, label: phase.label }))
 		};
 	}
 
 	try {
-		const { candidates, warning } = await loadAdminCandidates(supabase);
+		const { candidates, warning, incompleteCount } = await loadAdminCandidates(supabase);
 		return {
 			configured: true as const,
 			candidates,
 			warning,
+			incompleteCount,
 			successMessage,
 			phaseOptions: SELECTION_PHASES.map((phase) => ({ key: phase.key, label: phase.label }))
 		};
@@ -42,6 +44,7 @@ export const load: PageServerLoad = async ({ url }) => {
 			configured: true as const,
 			candidates: [],
 			warning: null,
+			incompleteCount: 0,
 			loadError: error instanceof Error ? error.message : 'Erro ao carregar candidatos.',
 			successMessage,
 			phaseOptions: SELECTION_PHASES.map((phase) => ({ key: phase.key, label: phase.label }))
