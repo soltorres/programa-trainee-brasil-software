@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import AdminPhaseForm from '$lib/components/admin/AdminPhaseForm.svelte';
+	import { ADMIN_PHASE_STYLES, type AdminPhaseKey } from '$lib/admin/adminPhaseStyles';
 	import type { AdminCandidateRow } from '$lib/admin/loadCandidates';
 	import type { ActionData, PageData } from './$types';
 
@@ -19,20 +20,39 @@
 
 	function statusBadge(candidate: AdminCandidateRow) {
 		if (candidate.profileIncomplete) {
-			return { label: 'Cadastro incompleto', class: 'bg-amber-100 text-amber-900' };
+			return { label: 'Cadastro incompleto', class: ADMIN_PHASE_STYLES.incomplete.badge };
 		}
 		if (candidate.isFrozen) {
-			return { label: 'Congelado', class: 'bg-slate-200 text-slate-700' };
+			return { label: 'Congelado', class: ADMIN_PHASE_STYLES.frozen.badge };
 		}
 		if (candidate.currentPhaseKey === 'concluido') {
-			return { label: 'Concluído', class: 'bg-green-100 text-green-800' };
+			return { label: 'Concluído', class: ADMIN_PHASE_STYLES.concluido.badge };
 		}
-		return { label: candidate.currentPhaseLabel, class: 'bg-blue-100 text-blue-800' };
+		const key = candidate.currentPhaseKey as AdminPhaseKey;
+		const style = ADMIN_PHASE_STYLES[key] ?? ADMIN_PHASE_STYLES.technical;
+		return { label: candidate.currentPhaseLabel, class: style.badge };
 	}
 
-	const completeCount = $derived(
-		data.configured ? data.candidates.filter((c) => !c.profileIncomplete).length : 0
-	);
+	function phasePillClass(phaseKey: string, completedAt: string | null) {
+		const key = phaseKey as AdminPhaseKey;
+		const style = ADMIN_PHASE_STYLES[key];
+		if (completedAt) return style?.pillCompleted ?? 'bg-slate-50/80 text-slate-900';
+		return style?.pillOpen ?? 'bg-slate-50/30 text-slate-700/90';
+	}
+
+	function filterChipColorClass(phaseKey: string, active: boolean) {
+		if (phaseKey === 'all') {
+			return active
+				? 'bg-slate-900 text-white border-slate-900 hover:bg-slate-800 ring-4 ring-slate-900/15'
+				: 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50';
+		}
+
+		const key = phaseKey as AdminPhaseKey;
+		const style = ADMIN_PHASE_STYLES[key] ?? ADMIN_PHASE_STYLES.technical;
+		return active ? style.chipActive : style.chip;
+	}
+
+	const completeCount = $derived(data.configured ? data.completeCount : 0);
 </script>
 
 <svelte:head>
@@ -56,7 +76,7 @@
 			</div>
 			<p class="text-sm font-medium text-slate-500">
 				{#if data.configured}
-					{data.candidates.length} no total
+					{data.totalCandidates} no total
 					<span class="text-slate-400">·</span>
 					{completeCount} com perfil completo
 					{#if data.incompleteCount > 0}
@@ -118,11 +138,44 @@
 				<p class="mb-4 text-sm text-amber-800">{data.warning}</p>
 			{/if}
 
+			{#if data.phaseFilters?.length}
+				<div class="mb-6">
+					<div class="flex flex-wrap items-center justify-between gap-3">
+						<p class="text-sm font-semibold text-slate-700">Filtrar por fase</p>
+						{#if data.phaseFilterKey !== 'all'}
+							<p class="text-xs text-slate-500">{data.candidates.length} candidato(s) no filtro</p>
+						{/if}
+					</div>
+					<div class="mt-3 flex flex-wrap gap-2">
+						{#each data.phaseFilters as filter (filter.key)}
+							{@const active = filter.key === data.phaseFilterKey}
+							<a
+								href={filter.key === 'all' ? '?' : `?phase=${filter.key}`}
+								class={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-green-500/50 ${filterChipColorClass(
+									filter.key,
+									active
+								)}`}
+								aria-current={active ? 'page' : undefined}
+							>
+								<span class="truncate">{filter.label}</span>
+								<span class={`text-[10px] font-semibold ${active ? 'text-white/90' : 'text-slate-500'}`}>
+									{filter.count}
+								</span>
+							</a>
+						{/each}
+					</div>
+				</div>
+			{/if}
+
 			{#if data.candidates.length === 0}
 				<div
 					class="rounded-2xl border border-slate-200/80 bg-white px-6 py-12 text-center text-sm text-slate-600 shadow-[0_2px_8px_rgba(0,0,0,0.02)]"
 				>
-					Nenhum candidato cadastrado ainda.
+					{#if data.phaseFilterKey === 'all'}
+						Nenhum candidato cadastrado ainda.
+					{:else}
+						Nenhum candidato corresponde ao filtro.
+					{/if}
 				</div>
 			{:else}
 				<div class="space-y-4">
@@ -246,9 +299,10 @@
 											<ul class="mt-3 space-y-1.5">
 												{#each candidate.phases as phase}
 													<li
-														class="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm {phase.completedAt
-															? 'bg-green-50/80 text-green-900'
-															: 'text-slate-600'}"
+														class="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm {phasePillClass(
+															phase.key,
+															phase.completedAt
+														)}"
 													>
 														<span>{phase.label}</span>
 														<span class="text-xs text-slate-500">

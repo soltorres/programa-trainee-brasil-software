@@ -6,6 +6,13 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
 const PHASE_KEYS = new Set<string>(SELECTION_PHASES.map((phase) => phase.key));
+const FILTER_PHASE_KEYS = new Set<string>([
+	'all',
+	...SELECTION_PHASES.map((phase) => phase.key),
+	'concluido',
+	'frozen',
+	'incomplete'
+]);
 
 function adminUnavailable() {
 	return fail(503, {
@@ -16,34 +23,98 @@ function adminUnavailable() {
 export const load: PageServerLoad = async ({ url }) => {
 	const supabase = getSupabaseAdmin();
 	const successMessage = url.searchParams.get('success');
+	const requestedPhase = url.searchParams.get('phase');
+	const phaseFilterKey = requestedPhase && FILTER_PHASE_KEYS.has(requestedPhase) ? requestedPhase : 'all';
 
 	if (!supabase) {
 		return {
 			configured: false as const,
 			candidates: [],
+			totalCandidates: 0,
+			completeCount: 0,
 			warning: null,
 			incompleteCount: 0,
 			successMessage,
-			phaseOptions: SELECTION_PHASES.map((phase) => ({ key: phase.key, label: phase.label }))
+			phaseOptions: SELECTION_PHASES.map((phase) => ({ key: phase.key, label: phase.label })),
+			phaseFilterKey: 'all',
+			phaseFilters: [
+				{ key: 'all', label: 'Todas', count: 0 },
+				...SELECTION_PHASES.map((phase) => ({
+					key: phase.key,
+					label: phase.label,
+					count: 0
+				})),
+				{ key: 'concluido', label: 'Concluído', count: 0 },
+				{ key: 'frozen', label: 'Congelado', count: 0 },
+				{ key: 'incomplete', label: 'Cadastro incompleto', count: 0 }
+			]
 		};
 	}
 
 	try {
 		const { candidates, warning, incompleteCount } = await loadAdminCandidates(supabase);
+
+		const totalCandidates = candidates.length;
+		const completeCount = totalCandidates - incompleteCount;
+		const countsByPhaseKey = new Map<string, number>();
+		for (const candidate of candidates) {
+			const key = candidate.currentPhaseKey;
+			countsByPhaseKey.set(key, (countsByPhaseKey.get(key) ?? 0) + 1);
+		}
+
+		const phaseFilters = [
+			{ key: 'all', label: 'Todas', count: totalCandidates },
+			...SELECTION_PHASES.map((phase) => ({
+				key: phase.key,
+				label: phase.label,
+				count: countsByPhaseKey.get(phase.key) ?? 0
+			})),
+			{ key: 'concluido', label: 'Concluído', count: countsByPhaseKey.get('concluido') ?? 0 },
+			{ key: 'frozen', label: 'Congelado', count: countsByPhaseKey.get('frozen') ?? 0 },
+			{
+				key: 'incomplete',
+				label: 'Cadastro incompleto',
+				count: countsByPhaseKey.get('incomplete') ?? 0
+			}
+		];
+
+		const filteredCandidates =
+			phaseFilterKey === 'all'
+				? candidates
+				: candidates.filter((candidate) => candidate.currentPhaseKey === phaseFilterKey);
+
 		return {
 			configured: true as const,
-			candidates,
+			candidates: filteredCandidates,
+			totalCandidates,
+			completeCount,
 			warning,
 			incompleteCount,
 			successMessage,
-			phaseOptions: SELECTION_PHASES.map((phase) => ({ key: phase.key, label: phase.label }))
+			phaseOptions: SELECTION_PHASES.map((phase) => ({ key: phase.key, label: phase.label })),
+			phaseFilterKey,
+			phaseFilters
 		};
 	} catch (error) {
 		console.error('superadmin load', error);
 		return {
 			configured: true as const,
 			candidates: [],
+			totalCandidates: 0,
+			completeCount: 0,
 			warning: null,
+			phaseFilterKey: 'all',
+			phaseFilters: [
+				{ key: 'all', label: 'Todas', count: 0 },
+				...SELECTION_PHASES.map((phase) => ({
+					key: phase.key,
+					label: phase.label,
+					count: 0
+				})),
+				{ key: 'concluido', label: 'Concluído', count: 0 },
+				{ key: 'frozen', label: 'Congelado', count: 0 },
+				{ key: 'incomplete', label: 'Cadastro incompleto', count: 0 }
+			],
 			incompleteCount: 0,
 			loadError: error instanceof Error ? error.message : 'Erro ao carregar candidatos.',
 			successMessage,
